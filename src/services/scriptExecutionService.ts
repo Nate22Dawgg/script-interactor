@@ -108,7 +108,7 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
   
   if (!messageSent && window.executeScriptFallback) {
     // Use fallback mechanism if WebSocket is not available
-    return window.executeScriptFallback(request.scriptId, sanitizedParameters, language);
+    return window.executeScriptFallback(request.scriptId, sanitizedParameters);
   }
   
   // Simulate a delay for the script to start executing

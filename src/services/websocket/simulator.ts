@@ -1,6 +1,13 @@
-
 import { MessageType, ScriptLanguage } from './constants';
 import { WebSocketMessage, LogMessage, OutputMessage, ExecutionStatusMessage } from './types';
+
+// Add the missing window property declaration
+declare global {
+  interface Window {
+    _scriptSubscribers?: Record<string, ((message: WebSocketMessage) => void)[]>;
+    executeScriptFallback?: (scriptId: string, parameters: Record<string, any>) => Promise<any>;
+  }
+}
 
 // Simulate script execution for development & testing
 export const simulateScriptExecution = (
