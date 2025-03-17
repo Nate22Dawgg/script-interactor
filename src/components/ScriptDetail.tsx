@@ -1,10 +1,12 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Script } from '../lib/types';
+import { Script, UIComponent } from '../lib/types';
 import { toast } from 'sonner';
-import { executeScript, updateScript } from '../services/scriptService';
+import { executeScript, updateScript, updateScriptUI } from '../services/scriptService';
 import ScriptOutput from './ScriptOutput';
+import ScriptUI from './ScriptUI';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface ScriptDetailProps {
   script: Script;
@@ -12,10 +14,12 @@ interface ScriptDetailProps {
 }
 
 const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'code' | 'output' | 'info'>('code');
+  const [activeTab, setActiveTab] = useState<'code' | 'output' | 'ui' | 'info'>('code');
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState(script.code);
   const [isRunning, setIsRunning] = useState(script.status === 'running');
+  const [isEditingUI, setIsEditingUI] = useState(false);
+  const [parameters, setParameters] = useState<Record<string, any>>({});
   const [executionStats, setExecutionStats] = useState({
     executionTime: script.executionTime || 0,
     memory: script.memory || 0,
@@ -61,7 +65,10 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
     
     try {
       // Execute the script
-      await executeScript({ scriptId: script.id });
+      await executeScript({ 
+        scriptId: script.id,
+        parameters: parameters
+      });
       
       // The real-time updates will come through WebSocket
       // For now, we'll simulate completion after a delay
@@ -134,6 +141,26 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
       toast.error('Failed to save script');
     }
   };
+  
+  const handleParametersChange = (params: Record<string, any>) => {
+    setParameters(params);
+  };
+  
+  const handleUpdateUI = async (components: UIComponent[]) => {
+    try {
+      const updatedScript = await updateScriptUI(script.id, components);
+      
+      if (onUpdate) {
+        onUpdate(updatedScript);
+      }
+      
+      setIsEditingUI(false);
+      toast.success('UI updated successfully');
+    } catch (error) {
+      console.error('Error updating UI:', error);
+      toast.error('Failed to update UI');
+    }
+  };
 
   const tabVariants = {
     active: {
@@ -158,18 +185,20 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
         </div>
         
         <div className="flex gap-3">
-          <motion.button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors duration-200"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => setIsEditing(!isEditing)}
-            disabled={activeTab !== 'code' || isRunning}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
-            </svg>
-            {isEditing ? 'Cancel' : 'Edit'}
-          </motion.button>
+          {activeTab === 'code' && (
+            <motion.button
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-foreground hover:bg-secondary/80 transition-colors duration-200"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setIsEditing(!isEditing)}
+              disabled={isRunning}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+              </svg>
+              {isEditing ? 'Cancel' : 'Edit'}
+            </motion.button>
+          )}
           
           {isEditing ? (
             <motion.button
@@ -183,7 +212,7 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
               </svg>
               Save
             </motion.button>
-          ) : (
+          ) : activeTab !== 'ui' && (
             <motion.button
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors duration-200 ${
                 isRunning 
@@ -205,19 +234,18 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
       </div>
       
       <div className="border-b border-border">
-        <div className="flex space-x-8">
-          {(['code', 'output', 'info'] as const).map((tab) => (
-            <motion.button
-              key={tab}
-              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors duration-200`}
-              variants={tabVariants}
-              animate={activeTab === tab ? 'active' : 'inactive'}
-              onClick={() => setActiveTab(tab)}
-            >
-              <span className="capitalize">{tab}</span>
-            </motion.button>
-          ))}
-        </div>
+        <Tabs 
+          value={activeTab} 
+          onValueChange={(value) => setActiveTab(value as any)}
+          className="w-full"
+        >
+          <TabsList className="grid grid-cols-4 w-full">
+            <TabsTrigger value="code">Code</TabsTrigger>
+            <TabsTrigger value="ui">UI</TabsTrigger>
+            <TabsTrigger value="output">Output</TabsTrigger>
+            <TabsTrigger value="info">Info</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
       
       <motion.div
@@ -242,6 +270,17 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
               </pre>
             )}
           </div>
+        )}
+        
+        {activeTab === 'ui' && (
+          <ScriptUI 
+            components={script.generatedUI}
+            parameters={script.parameters}
+            onParametersChange={handleParametersChange}
+            onExecute={handleRunScript}
+            onEdit={handleUpdateUI}
+            isEditing={isEditingUI}
+          />
         )}
         
         {activeTab === 'output' && (

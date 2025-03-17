@@ -7,6 +7,8 @@ import { Script } from '../lib/types';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
 import { getScripts, uploadScript } from '../services/scriptService';
+import { Button } from '@/components/ui/button';
+import { PlusIcon, XIcon } from 'lucide-react';
 
 const Dashboard = () => {
   const [scripts, setScripts] = useState<Script[]>([]);
@@ -30,9 +32,9 @@ const Dashboard = () => {
     fetchScripts();
   }, []);
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, description?: string) => {
     try {
-      const newScript = await uploadScript(file);
+      const newScript = await uploadScript(file, description);
       setScripts([newScript, ...scripts]);
       setShowUpload(false);
       toast.success(`Script "${file.name}" added successfully`);
@@ -55,31 +57,29 @@ const Dashboard = () => {
             Script Dashboard
           </motion.h1>
           
-          <motion.button
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors duration-200"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+          <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.3 }}
-            onClick={() => setShowUpload(!showUpload)}
           >
-            {showUpload ? (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                </svg>
-                Cancel
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-                Upload Script
-              </>
-            )}
-          </motion.button>
+            <Button
+              variant={showUpload ? "secondary" : "default"}
+              className="flex items-center gap-2"
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              {showUpload ? (
+                <>
+                  <XIcon className="w-4 h-4" />
+                  Cancel
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="w-4 h-4" />
+                  Upload Script
+                </>
+              )}
+            </Button>
+          </motion.div>
         </div>
         
         {showUpload && (
@@ -90,7 +90,13 @@ const Dashboard = () => {
             transition={{ duration: 0.3 }}
             className="overflow-hidden"
           >
-            <FileUpload onUpload={handleUpload} />
+            <FileUpload 
+              onUpload={handleUpload}
+              allowedExtensions={['.py']}
+              maxSizeMB={10}
+              showDescription={true}
+              analyzeScriptContent={true}
+            />
           </motion.div>
         )}
         

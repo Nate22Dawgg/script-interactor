@@ -15,6 +15,7 @@ export interface Script {
   logs?: LogEntry[];
   visualizations?: Visualization[];
   generatedUI?: UIComponent[];
+  parameters?: Parameter[];
 }
 
 export interface LogEntry {
@@ -30,14 +31,26 @@ export interface Visualization {
   config?: any;
 }
 
+export interface Parameter {
+  id: string;
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  default?: any;
+  description?: string;
+  required?: boolean;
+  options?: string[] | number[];
+}
+
 export interface UIComponent {
   id: string;
-  type: 'input' | 'slider' | 'checkbox' | 'button' | 'select' | 'container';
+  type: 'input' | 'slider' | 'checkbox' | 'button' | 'select' | 'container' | 'chart' | 'table';
   label?: string;
   value?: any;
   options?: any[];
   children?: UIComponent[];
   handler?: string; // Reference to a function in the script
+  target?: string; // Target parameter or visualization
+  config?: any; // Additional configuration
 }
 
 export interface ScriptExecutionRequest {
