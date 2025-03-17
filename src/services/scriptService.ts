@@ -363,19 +363,17 @@ export const analyzeScriptForParameters = (code: string): Parameter[] => {
       paramsList.forEach((param, index) => {
         const paramParts = param.trim().split('=');
         const paramName = paramParts[0].trim();
-        let paramDefault = paramParts.length > 1 ? paramParts[1].trim() : undefined;
+        let paramDefault: any = paramParts.length > 1 ? paramParts[1].trim() : undefined;
         let paramType: Parameter['type'] = 'string';
         
         // Try to infer type from default value
         if (paramDefault) {
           if (paramDefault === 'True' || paramDefault === 'False') {
             paramType = 'boolean';
-            // Fix: Convert boolean string to boolean value instead of assigning directly
-            paramDefault = paramDefault === 'True';
+            paramDefault = paramDefault === 'True'; // Convert to actual boolean
           } else if (!isNaN(Number(paramDefault))) {
             paramType = 'number';
-            // Fix: Convert number string to number value instead of assigning directly
-            paramDefault = Number(paramDefault);
+            paramDefault = Number(paramDefault); // Convert to actual number
           } else if (paramDefault.startsWith('[') && paramDefault.endsWith(']')) {
             paramType = 'array';
           } else if (paramDefault.startsWith('{') && paramDefault.endsWith('}')) {

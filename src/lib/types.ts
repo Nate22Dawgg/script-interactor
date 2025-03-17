@@ -35,7 +35,7 @@ export interface Parameter {
   id: string;
   name: string;
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  default?: any;
+  default?: any; // Changed from string to any to allow different types
   description?: string;
   required?: boolean;
   options?: string[] | number[];
