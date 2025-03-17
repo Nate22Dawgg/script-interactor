@@ -55,7 +55,7 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
     if (onUpdate) {
       onUpdate({
         ...script,
-        status: 'running'
+        status: 'running' as const
       });
     }
     
@@ -66,7 +66,7 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
       // The real-time updates will come through WebSocket
       // For now, we'll simulate completion after a delay
       setTimeout(() => {
-        const completedScript = {
+        const completedScript: Script = {
           ...script,
           status: 'completed',
           lastRun: new Date().toISOString(),
