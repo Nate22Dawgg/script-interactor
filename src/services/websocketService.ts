@@ -1,4 +1,3 @@
-
 import { toast } from 'sonner';
 
 // WebSocket connection for real-time script execution
@@ -7,7 +6,7 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const listeners: Map<string, (data: any) => void> = new Map();
 
-// Initialize WebSocket connection
+// Enhanced WebSocket with security considerations
 export const initializeWebSocket = () => {
   if (socket && socket.readyState === WebSocket.OPEN) return;
   
@@ -21,8 +20,7 @@ export const initializeWebSocket = () => {
     return;
   }
 
-  // In production, this would point to your actual WebSocket server
-  // For development, we'll simulate WebSocket with a fallback mechanism
+  // Use secure WebSocket connections
   try {
     const wsUrl = import.meta.env.DEV 
       ? 'ws://localhost:8000/ws/scripts' 
@@ -30,16 +28,47 @@ export const initializeWebSocket = () => {
     
     socket = new WebSocket(wsUrl);
     
+    // Set timeout for connection
+    const connectionTimeout = setTimeout(() => {
+      if (socket && socket.readyState !== WebSocket.OPEN) {
+        socket.close();
+        console.error('WebSocket connection timeout');
+      }
+    }, 5000);
+    
     socket.onopen = () => {
       console.log('WebSocket connection established');
+      clearTimeout(connectionTimeout);
       reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+      
+      // Implement periodic heartbeat to keep connection alive
+      const heartbeatInterval = setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(JSON.stringify({ type: 'heartbeat' }));
+        } else {
+          clearInterval(heartbeatInterval);
+        }
+      }, 30000);
     };
     
     socket.onmessage = (event) => {
       try {
+        // Validate JSON payload before processing
         const data = JSON.parse(event.data);
         
+        // Validate message type
+        if (!data.type) {
+          console.warn('Invalid WebSocket message format: missing type');
+          return;
+        }
+        
         if (data.type === 'log' || data.type === 'output' || data.type === 'visualization') {
+          // Validate scriptId
+          if (!data.scriptId) {
+            console.warn('Invalid WebSocket message: missing scriptId');
+            return;
+          }
+          
           const scriptId = data.scriptId;
           const callback = listeners.get(scriptId);
           if (callback) {
@@ -47,12 +76,25 @@ export const initializeWebSocket = () => {
           }
         }
         
-        if (data.type === 'execution_status' && data.status === 'completed') {
-          toast.success(`Script ${data.scriptId} execution completed`);
-        }
-        
-        if (data.type === 'execution_status' && data.status === 'failed') {
-          toast.error(`Script ${data.scriptId} execution failed: ${data.error}`);
+        if (data.type === 'execution_status') {
+          // Validate execution status data
+          if (!data.scriptId || !data.status) {
+            console.warn('Invalid execution status message');
+            return;
+          }
+          
+          if (data.status === 'completed') {
+            toast.success(`Script ${data.scriptId} execution completed`);
+          }
+          
+          if (data.status === 'failed') {
+            toast.error(`Script ${data.scriptId} execution failed: ${data.error || 'Unknown error'}`);
+          }
+          
+          // Handle security related events
+          if (data.status === 'security_violation') {
+            toast.error(`Security violation detected: ${data.details || 'Unknown issue'}`);
+          }
         }
       } catch (error) {
         console.error('Error parsing WebSocket message:', error);
@@ -61,6 +103,7 @@ export const initializeWebSocket = () => {
     
     socket.onerror = (error) => {
       console.error('WebSocket error:', error);
+      clearTimeout(connectionTimeout);
       // Don't show toast on every error to avoid overwhelming the user
       if (reconnectAttempts === 0) {
         toast.error('Lost connection to the server. Trying to reconnect...');
@@ -69,6 +112,7 @@ export const initializeWebSocket = () => {
     
     socket.onclose = () => {
       console.log('WebSocket connection closed. Attempting to reconnect...');
+      clearTimeout(connectionTimeout);
       socket = null;
       reconnectAttempts++;
       
@@ -174,9 +218,38 @@ export const simulateScriptExecution = (scriptId: string, parameters: Record<str
   }, 800);
 };
 
-// Subscribe to script execution updates
+// Subscribe to script execution updates with added security
 export const subscribeToScript = (scriptId: string, callback: (data: any) => void) => {
-  listeners.set(scriptId, callback);
+  // Validate scriptId to prevent injection
+  if (typeof scriptId !== 'string' || scriptId.length === 0 || scriptId.length > 100) {
+    console.error('Invalid scriptId provided to subscribeToScript');
+    return () => {};
+  }
+  
+  // Create a secure wrapped callback that validates data
+  const secureCallback = (data: any) => {
+    // Basic validation before passing to user code
+    if (!data || typeof data !== 'object' || !data.type) {
+      console.warn('Invalid data received from WebSocket');
+      return;
+    }
+    
+    // Validate specific fields based on message type
+    if (data.type === 'log' && (!data.level || !data.message)) {
+      console.warn('Invalid log message format');
+      return;
+    }
+    
+    if (data.type === 'output' && data.content === undefined) {
+      console.warn('Invalid output message format');
+      return;
+    }
+    
+    // Safe to pass to application code
+    callback(data);
+  };
+  
+  listeners.set(scriptId, secureCallback);
   
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
@@ -215,11 +288,30 @@ export const getWebSocketStatus = () => {
   }
 };
 
-// Send a message through WebSocket
+// Send a message through WebSocket with validation
 export const sendWebSocketMessage = (message: any) => {
+  // Basic message validation
+  if (!message || typeof message !== 'object' || !message.type) {
+    console.error('Invalid WebSocket message format');
+    return false;
+  }
+  
   if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify(message));
-    return true;
+    try {
+      const messageString = JSON.stringify(message);
+      
+      // Limit message size to prevent DoS
+      if (messageString.length > 100000) { // 100KB limit
+        console.error('WebSocket message too large');
+        return false;
+      }
+      
+      socket.send(messageString);
+      return true;
+    } catch (error) {
+      console.error('Error sending WebSocket message:', error);
+      return false;
+    }
   }
   return false;
 };

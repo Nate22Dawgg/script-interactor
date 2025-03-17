@@ -5,7 +5,9 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { Textarea } from './ui/textarea';
-import { PlusCircle, Upload, FileCode, X } from 'lucide-react';
+import { PlusCircle, Upload, FileCode, X, AlertTriangle, Shield } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { scanUploadedFile } from '../services/mockDataService';
 
 interface FileUploadProps {
   onUpload: (file: File, description?: string) => void;
@@ -28,6 +30,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [fileContent, setFileContent] = useState<string | null>(null);
+  const [securityIssues, setSecurityIssues] = useState<string[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -72,6 +76,24 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
     
     setFile(selectedFile);
+    setSecurityIssues([]);
+    
+    // Security scanning
+    setIsScanning(true);
+    try {
+      const scanResult = await scanUploadedFile(selectedFile);
+      if (!scanResult.safe) {
+        setSecurityIssues(scanResult.issues);
+        toast.error('Security issues detected in the uploaded file');
+      } else {
+        toast.success('File security scan passed');
+      }
+    } catch (error) {
+      console.error('Error scanning file:', error);
+      toast.error('Failed to scan file for security issues');
+    } finally {
+      setIsScanning(false);
+    }
     
     // Read file content if analysis is enabled
     if (analyzeScriptContent) {
@@ -108,6 +130,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const handleUpload = () => {
     if (!file) return;
     
+    // Don't allow upload if security issues were found
+    if (securityIssues.length > 0) {
+      toast.error('Cannot upload file with security issues');
+      return;
+    }
+    
     setIsUploading(true);
     
     // Simulate progress for demo purposes
@@ -127,6 +155,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             setDescription('');
             setUploadProgress(0);
             setIsUploading(false);
+            setSecurityIssues([]);
           }, 500);
           
           return 100;
@@ -244,11 +273,37 @@ const FileUpload: React.FC<FileUploadProps> = ({
               variant="ghost" 
               size="icon" 
               onClick={handleCancel}
-              disabled={isUploading}
+              disabled={isUploading || isScanning}
             >
               <X size={18} />
             </Button>
           </div>
+          
+          {isScanning && (
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin">
+                  <Shield size={16} />
+                </div>
+                <span className="text-sm">Scanning file for security issues...</span>
+              </div>
+              <Progress value={50} className="h-1" />
+            </div>
+          )}
+          
+          {securityIssues.length > 0 && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Security Issues Detected</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-5 space-y-1 mt-2">
+                  {securityIssues.map((issue, index) => (
+                    <li key={index} className="text-sm">{issue}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
           
           {showDescription && (
             <div className="space-y-2">
@@ -258,7 +313,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
-                disabled={isUploading}
+                disabled={isUploading || isScanning}
               />
             </div>
           )}
@@ -292,12 +347,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 variant="outline" 
                 className="flex-1"
                 onClick={handleCancel}
+                disabled={isScanning}
               >
                 Cancel
               </Button>
               <Button 
                 className="flex-1"
                 onClick={handleUpload}
+                disabled={isScanning || securityIssues.length > 0}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Script
