@@ -1,7 +1,7 @@
 import { ScriptExecutionRequest, ScriptExecutionResponse } from '../lib/types';
 import { sendWebSocketMessage, simulateScriptExecution } from './websocket';
 import { toast } from 'sonner';
-import { MessageType } from './websocket/constants';
+import { MessageType, ScriptLanguage, LANGUAGE_RESOURCE_LIMITS } from './websocket/constants';
 
 // Rate limiting implementation
 const rateLimiter = {
@@ -32,7 +32,7 @@ const rateLimiter = {
   }
 };
 
-// Security scanner for script parameters
+// Enhanced security scanner for script parameters
 const sanitizeParameters = (parameters: Record<string, any>): Record<string, any> => {
   const sanitized: Record<string, any> = {};
   
@@ -81,21 +81,34 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
   // Sanitize parameters
   const sanitizedParameters = request.parameters ? sanitizeParameters(request.parameters) : {};
   
+  // Get script details to determine language
+  const scriptDetails = await fetch(`/api/scripts/${request.scriptId}`)
+    .then(res => res.ok ? res.json() : null)
+    .catch(() => null);
+  
+  // Determine appropriate resource limits based on language
+  const language = scriptDetails?.language || 'python';
+  const defaultLimits = LANGUAGE_RESOURCE_LIMITS[language as ScriptLanguage] || 
+                        LANGUAGE_RESOURCE_LIMITS[ScriptLanguage.PYTHON];
+  
+  // Merge default limits with any provided limits
+  const executionLimits = {
+    ...defaultLimits,
+    ...(request.executionLimits || {})
+  };
+  
   // Send execution request via WebSocket if available
   const messageSent = sendWebSocketMessage({
     type: MessageType.EXECUTE_SCRIPT,
     scriptId: request.scriptId,
     parameters: sanitizedParameters,
-    executionLimits: {
-      timeoutSeconds: 60,
-      memoryLimitMB: 128,
-      maxLoopIterations: 10000
-    }
+    language: language,
+    executionLimits
   });
   
   if (!messageSent && window.executeScriptFallback) {
     // Use fallback mechanism if WebSocket is not available
-    return window.executeScriptFallback(request.scriptId, sanitizedParameters);
+    return window.executeScriptFallback(request.scriptId, sanitizedParameters, language);
   }
   
   // Simulate a delay for the script to start executing
@@ -108,10 +121,50 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
   };
 };
 
-// Add script validation functions
-export const validateScript = (code: string): { valid: boolean; issues: string[] } => {
+// Enhanced script validation with multi-language support
+export const validateScript = (code: string, language: string = 'python'): { valid: boolean; issues: string[] } => {
   const issues: string[] = [];
   
+  // Common checks for all languages
+  if (!code || code.trim() === '') {
+    issues.push('Script is empty');
+    return { valid: false, issues };
+  }
+  
+  // Language-specific checks
+  switch (language.toLowerCase()) {
+    case 'python':
+      // Python-specific validation
+      validatePythonScript(code, issues);
+      break;
+    case 'r':
+      // R-specific validation
+      validateRScript(code, issues);
+      break;
+    case 'julia':
+      // Julia-specific validation
+      validateJuliaScript(code, issues);
+      break;
+    case 'javascript':
+      // JavaScript-specific validation
+      validateJavaScriptScript(code, issues);
+      break;
+    case 'bash':
+      // Bash-specific validation
+      validateBashScript(code, issues);
+      break;
+    default:
+      issues.push(`Unsupported language: ${language}`);
+  }
+  
+  return {
+    valid: issues.length === 0,
+    issues
+  };
+};
+
+// Python script validation
+const validatePythonScript = (code: string, issues: string[]) => {
   // Check for potentially dangerous imports
   const dangerousImports = [
     'os.system', 'subprocess.', 'eval(', 'exec(', '__import__', 
@@ -143,9 +196,88 @@ export const validateScript = (code: string): { valid: boolean; issues: string[]
       });
     }
   }
+};
+
+// R script validation
+const validateRScript = (code: string, issues: string[]) => {
+  // Check for potentially dangerous operations in R
+  const dangerousOperations = [
+    'system(', 'shell(', 'eval(parse', 'source(', 
+    'install.packages(', 'library(parallel)', 'socket'
+  ];
   
-  return {
-    valid: issues.length === 0,
-    issues
-  };
+  dangerousOperations.forEach(op => {
+    if (code.includes(op)) {
+      issues.push(`Contains potentially unsafe operation: ${op}`);
+    }
+  });
+  
+  // Check for infinite loops
+  if ((code.includes('while(TRUE)') || code.includes('while (TRUE)')) && 
+      !code.includes('break') && !code.includes('return')) {
+    issues.push('Contains potential infinite loop');
+  }
+};
+
+// Julia script validation
+const validateJuliaScript = (code: string, issues: string[]) => {
+  // Check for potentially dangerous operations in Julia
+  const dangerousOperations = [
+    'run(', 'eval(', 'include(', 'import', 'using Distributed', 
+    'open(', 'download(', 'connect('
+  ];
+  
+  dangerousOperations.forEach(op => {
+    if (code.includes(op)) {
+      issues.push(`Contains potentially unsafe operation: ${op}`);
+    }
+  });
+  
+  // Check for infinite loops
+  if ((code.includes('while true') || code.includes('while (true)')) && 
+      !code.includes('break') && !code.includes('return')) {
+    issues.push('Contains potential infinite loop');
+  }
+};
+
+// JavaScript script validation
+const validateJavaScriptScript = (code: string, issues: string[]) => {
+  // Check for potentially dangerous operations in JavaScript
+  const dangerousOperations = [
+    'eval(', 'Function(', 'setTimeout(', 'setInterval(', 
+    'require(', 'process.', 'window.', 'document.'
+  ];
+  
+  dangerousOperations.forEach(op => {
+    if (code.includes(op)) {
+      issues.push(`Contains potentially unsafe operation: ${op}`);
+    }
+  });
+  
+  // Check for infinite loops
+  if ((code.includes('while(true)') || code.includes('while (true)')) && 
+      !code.includes('break') && !code.includes('return')) {
+    issues.push('Contains potential infinite loop');
+  }
+};
+
+// Bash script validation
+const validateBashScript = (code: string, issues: string[]) => {
+  // Check for potentially dangerous operations in Bash
+  const dangerousOperations = [
+    'rm -rf', 'mkfs', 'dd', '> /dev/', '| sh', 
+    'curl | bash', 'wget | sh', 'sudo'
+  ];
+  
+  dangerousOperations.forEach(op => {
+    if (code.includes(op)) {
+      issues.push(`Contains potentially unsafe operation: ${op}`);
+    }
+  });
+  
+  // Check for infinite loops
+  if ((code.includes('while true') || code.includes('while :')) && 
+      !code.includes('break') && !code.includes('exit')) {
+    issues.push('Contains potential infinite loop');
+  }
 };

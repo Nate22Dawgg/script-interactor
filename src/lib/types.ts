@@ -1,10 +1,9 @@
-
 export interface Script {
   id: string;
   name: string;
   description: string;
   code: string;
-  language: 'python' | 'javascript' | 'other';
+  language: 'python' | 'r' | 'julia' | 'javascript' | 'bash';
   dateCreated: string;
   lastRun?: string;
   status: 'idle' | 'running' | 'completed' | 'failed';
@@ -16,6 +15,8 @@ export interface Script {
   visualizations?: Visualization[];
   generatedUI?: UIComponent[];
   parameters?: Parameter[];
+  relatedTools?: string[];
+  performanceMetrics?: PerformanceMetrics;
 }
 
 export interface LogEntry {
@@ -35,7 +36,7 @@ export interface Parameter {
   id: string;
   name: string;
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  default?: any; // Changed from string to any to allow different types
+  default?: any;
   description?: string;
   required?: boolean;
   options?: string[] | number[];
@@ -48,14 +49,19 @@ export interface UIComponent {
   value?: any;
   options?: any[];
   children?: UIComponent[];
-  handler?: string; // Reference to a function in the script
-  target?: string; // Target parameter or visualization
-  config?: any; // Additional configuration
+  handler?: string;
+  target?: string;
+  config?: any;
 }
 
 export interface ScriptExecutionRequest {
   scriptId: string;
   parameters?: Record<string, any>;
+  executionLimits?: {
+    timeoutSeconds?: number;
+    memoryLimitMB?: number;
+    maxLoopIterations?: number;
+  };
 }
 
 export interface ScriptExecutionResponse {
@@ -69,4 +75,21 @@ export interface ExecutionEnvironment {
   memoryLimit: number;
   timeoutSeconds: number;
   allowedModules: string[];
+}
+
+export interface PerformanceMetrics {
+  executionTime: number;
+  memoryUsage: number;
+  cpuUsage: number;
+  networkRequests?: number;
+  dataProcessed?: number;
+}
+
+export interface ScalingMetrics {
+  currentLoad: number;
+  instanceCount: number;
+  averageResponseTime: number;
+  errorRate: number;
+  cpuUtilization: number;
+  memoryUtilization: number;
 }
