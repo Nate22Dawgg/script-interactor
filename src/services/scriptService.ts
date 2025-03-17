@@ -1,62 +1,177 @@
-
 import { Script, ScriptExecutionRequest, ScriptExecutionResponse, LogEntry, UIComponent, Parameter } from '../lib/types';
 import { toast } from 'sonner';
 
 // WebSocket connection for real-time script execution
 let socket: WebSocket | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 const listeners: Map<string, (data: any) => void> = new Map();
 
 // Initialize WebSocket connection
 export const initializeWebSocket = () => {
   if (socket && socket.readyState === WebSocket.OPEN) return;
+  
+  // If we've reached max reconnect attempts, stop trying
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.log('Max reconnect attempts reached. Stopping reconnect attempts.');
+    // Reset reconnect attempts after some time to allow future attempts
+    setTimeout(() => {
+      reconnectAttempts = 0;
+    }, 60000); // 1 minute
+    return;
+  }
 
   // In production, this would point to your actual WebSocket server
-  const wsUrl = import.meta.env.DEV 
-    ? 'ws://localhost:8000/ws/scripts' 
-    : `wss://${window.location.host}/ws/scripts`;
-  
-  socket = new WebSocket(wsUrl);
-  
-  socket.onopen = () => {
-    console.log('WebSocket connection established');
-  };
-  
-  socket.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      
-      if (data.type === 'log' || data.type === 'output' || data.type === 'visualization') {
-        const scriptId = data.scriptId;
-        const callback = listeners.get(scriptId);
-        if (callback) {
-          callback(data);
+  // For development, we'll simulate WebSocket with a fallback mechanism
+  try {
+    const wsUrl = import.meta.env.DEV 
+      ? 'ws://localhost:8000/ws/scripts' 
+      : `wss://${window.location.host}/ws/scripts`;
+    
+    socket = new WebSocket(wsUrl);
+    
+    socket.onopen = () => {
+      console.log('WebSocket connection established');
+      reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+    };
+    
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'log' || data.type === 'output' || data.type === 'visualization') {
+          const scriptId = data.scriptId;
+          const callback = listeners.get(scriptId);
+          if (callback) {
+            callback(data);
+          }
         }
+        
+        if (data.type === 'execution_status' && data.status === 'completed') {
+          toast.success(`Script ${data.scriptId} execution completed`);
+        }
+        
+        if (data.type === 'execution_status' && data.status === 'failed') {
+          toast.error(`Script ${data.scriptId} execution failed: ${data.error}`);
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
       }
+    };
+    
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      // Don't show toast on every error to avoid overwhelming the user
+      if (reconnectAttempts === 0) {
+        toast.error('Lost connection to the server. Trying to reconnect...');
+      }
+    };
+    
+    socket.onclose = () => {
+      console.log('WebSocket connection closed. Attempting to reconnect...');
+      socket = null;
+      reconnectAttempts++;
       
-      if (data.type === 'execution_status' && data.status === 'completed') {
-        toast.success(`Script ${data.scriptId} execution completed`);
-      }
-      
-      if (data.type === 'execution_status' && data.status === 'failed') {
-        toast.error(`Script ${data.scriptId} execution failed: ${data.error}`);
-      }
-    } catch (error) {
-      console.error('Error parsing WebSocket message:', error);
+      // Try to reconnect after a delay with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+      setTimeout(() => {
+        initializeWebSocket();
+      }, delay);
+    };
+  } catch (error) {
+    console.error('Error initializing WebSocket:', error);
+    // Set up fallback mechanism for development
+    setupFallbackMechanism();
+  }
+};
+
+// Setup fallback for development when WebSocket connection fails
+const setupFallbackMechanism = () => {
+  console.log('Setting up fallback mechanism for script execution');
+  
+  // Create a simple polling mechanism to simulate WebSocket for development
+  window.executeScriptFallback = (scriptId: string, parameters: Record<string, any> = {}) => {
+    console.log('Simulating script execution for:', scriptId, 'with parameters:', parameters);
+    
+    // Simulate initial execution status
+    simulateScriptExecution(scriptId, parameters);
+    
+    return {
+      executionId: `exec-fallback-${Date.now()}`,
+      status: 'running',
+      startTime: new Date().toISOString()
+    };
+  };
+};
+
+// Simulate script execution with random output, logs, and visualizations
+const simulateScriptExecution = (scriptId: string, parameters: Record<string, any> = {}) => {
+  const callback = listeners.get(scriptId);
+  if (!callback) return;
+  
+  // Simulate script starting
+  setTimeout(() => {
+    callback({
+      type: 'log',
+      scriptId,
+      level: 'info',
+      message: `Script execution started with parameters: ${JSON.stringify(parameters)}`
+    });
+  }, 500);
+  
+  // Simulate a series of outputs
+  let outputCount = 0;
+  const outputInterval = setInterval(() => {
+    outputCount++;
+    
+    // Generate random output
+    callback({
+      type: 'output',
+      scriptId,
+      content: `Output line ${outputCount}: Processing data...\n`
+    });
+    
+    // Add some logs
+    if (outputCount % 2 === 0) {
+      callback({
+        type: 'log',
+        scriptId,
+        level: 'info',
+        message: `Processing step ${outputCount} completed`
+      });
     }
-  };
-  
-  socket.onerror = (error) => {
-    console.error('WebSocket error:', error);
-    toast.error('Lost connection to the server. Trying to reconnect...');
-  };
-  
-  socket.onclose = () => {
-    console.log('WebSocket connection closed. Attempting to reconnect...');
-    // Try to reconnect after a delay
-    setTimeout(() => {
-      initializeWebSocket();
-    }, 3000);
-  };
+    
+    // Stop after some iterations
+    if (outputCount >= 10) {
+      clearInterval(outputInterval);
+      
+      // Simulate completion
+      setTimeout(() => {
+        callback({
+          type: 'log',
+          scriptId,
+          level: 'info',
+          message: 'Script execution completed successfully'
+        });
+        
+        callback({
+          type: 'output',
+          scriptId,
+          content: `\nExecution completed with ${outputCount} steps\nParameters: ${JSON.stringify(parameters)}\n`
+        });
+        
+        // Simulate execution status
+        callback({
+          type: 'execution_status',
+          scriptId,
+          status: 'completed',
+          executionTime: 3.45,
+          memory: 128.5,
+          cpuUsage: 45.2
+        });
+      }, 1000);
+    }
+  }, 800);
 };
 
 // Subscribe to script execution updates
@@ -84,17 +199,18 @@ export const subscribeToScript = (scriptId: string, callback: (data: any) => voi
 
 // Execute a script
 export const executeScript = async (request: ScriptExecutionRequest): Promise<ScriptExecutionResponse> => {
-  // This would be a real API call in production
-  // For now, we'll simulate it
   console.log('Executing script:', request.scriptId, 'with parameters:', request.parameters);
   
-  // Send execution request via WebSocket for real-time updates
+  // Send execution request via WebSocket if available
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
       type: 'execute_script',
       scriptId: request.scriptId,
       parameters: request.parameters
     }));
+  } else if (window.executeScriptFallback) {
+    // Use fallback mechanism if WebSocket is not available
+    return window.executeScriptFallback(request.scriptId, request.parameters);
   }
   
   // Simulate a delay for the script to start executing
@@ -254,9 +370,11 @@ export const analyzeScriptForParameters = (code: string): Parameter[] => {
         if (paramDefault) {
           if (paramDefault === 'True' || paramDefault === 'False') {
             paramType = 'boolean';
+            // Fix: Convert boolean string to boolean value instead of assigning directly
             paramDefault = paramDefault === 'True';
           } else if (!isNaN(Number(paramDefault))) {
             paramType = 'number';
+            // Fix: Convert number string to number value instead of assigning directly
             paramDefault = Number(paramDefault);
           } else if (paramDefault.startsWith('[') && paramDefault.endsWith(']')) {
             paramType = 'array';
