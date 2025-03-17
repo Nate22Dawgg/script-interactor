@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import ScriptView from "./pages/ScriptView";
 import NotFound from "./pages/NotFound";
-import { initializeWebSocket } from "./services/scriptService";
+import { initializeWebSocket } from "./services/websocketService";
 
 const queryClient = new QueryClient();
 
