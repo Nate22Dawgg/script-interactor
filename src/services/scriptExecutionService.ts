@@ -1,7 +1,7 @@
-
 import { ScriptExecutionRequest, ScriptExecutionResponse } from '../lib/types';
-import { sendWebSocketMessage, simulateScriptExecution } from './websocketService';
+import { sendWebSocketMessage, simulateScriptExecution } from './websocket';
 import { toast } from 'sonner';
+import { MessageType } from './websocket/constants';
 
 // Rate limiting implementation
 const rateLimiter = {
@@ -83,7 +83,7 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
   
   // Send execution request via WebSocket if available
   const messageSent = sendWebSocketMessage({
-    type: 'execute_script',
+    type: MessageType.EXECUTE_SCRIPT,
     scriptId: request.scriptId,
     parameters: sanitizedParameters,
     executionLimits: {

@@ -10,7 +10,7 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import ScriptView from "./pages/ScriptView";
 import NotFound from "./pages/NotFound";
-import { initializeWebSocket } from "./services/websocketService";
+import { initializeWebSocket, getWebSocketStatus } from "./services/websocket";
 import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
 
 // Global error fallback component
@@ -73,8 +73,8 @@ const App = () => {
     
     // Check WebSocket connection status periodically
     const wsCheckInterval = setInterval(() => {
-      // Use a safer way to check the WS connection status
-      const status = (window as any).wsStatus || 'closed';
+      // Use the getWebSocketStatus function from our service
+      const status = getWebSocketStatus();
       setWsConnected(status === 'open');
     }, 5000);
     
