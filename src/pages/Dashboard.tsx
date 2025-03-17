@@ -1,33 +1,45 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import ScriptList from '../components/ScriptList';
 import FileUpload from '../components/FileUpload';
-import { mockScripts } from '../lib/mockData';
 import { Script } from '../lib/types';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { getScripts, uploadScript } from '../services/scriptService';
 
 const Dashboard = () => {
-  const [scripts, setScripts] = useState<Script[]>(mockScripts);
+  const [scripts, setScripts] = useState<Script[]>([]);
   const [showUpload, setShowUpload] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleUpload = (file: File) => {
-    // In a real app, we would process the file and upload it to the server
-    // For now, we'll just create a new mock script
-    const newScript: Script = {
-      id: (scripts.length + 1).toString(),
-      name: file.name.replace('.py', ''),
-      description: 'Uploaded script',
-      code: '# Python code will be loaded here\nprint("Hello, world!")',
-      language: 'python',
-      dateCreated: new Date().toISOString(),
-      status: 'idle'
+  useEffect(() => {
+    const fetchScripts = async () => {
+      setLoading(true);
+      try {
+        const fetchedScripts = await getScripts();
+        setScripts(fetchedScripts);
+      } catch (error) {
+        console.error('Error fetching scripts:', error);
+        toast.error('Failed to load scripts');
+      } finally {
+        setLoading(false);
+      }
     };
     
-    setScripts([newScript, ...scripts]);
-    setShowUpload(false);
-    toast.success(`Script "${file.name}" added successfully`);
+    fetchScripts();
+  }, []);
+
+  const handleUpload = async (file: File) => {
+    try {
+      const newScript = await uploadScript(file);
+      setScripts([newScript, ...scripts]);
+      setShowUpload(false);
+      toast.success(`Script "${file.name}" added successfully`);
+    } catch (error) {
+      console.error('Error uploading script:', error);
+      toast.error('Failed to upload script');
+    }
   };
 
   return (
@@ -82,7 +94,15 @@ const Dashboard = () => {
           </motion.div>
         )}
         
-        <ScriptList scripts={scripts} />
+        {loading ? (
+          <div className="flex justify-center py-20">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent animate-spin"></div>
+            </div>
+          </div>
+        ) : (
+          <ScriptList scripts={scripts} />
+        )}
       </div>
     </Layout>
   );

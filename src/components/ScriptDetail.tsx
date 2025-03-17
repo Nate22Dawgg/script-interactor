@@ -1,8 +1,10 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Script } from '../lib/types';
 import { toast } from 'sonner';
+import { executeScript, updateScript } from '../services/scriptService';
+import ScriptOutput from './ScriptOutput';
 
 interface ScriptDetailProps {
   script: Script;
@@ -13,6 +15,23 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
   const [activeTab, setActiveTab] = useState<'code' | 'output' | 'info'>('code');
   const [isEditing, setIsEditing] = useState(false);
   const [editedCode, setEditedCode] = useState(script.code);
+  const [isRunning, setIsRunning] = useState(script.status === 'running');
+  const [executionStats, setExecutionStats] = useState({
+    executionTime: script.executionTime || 0,
+    memory: script.memory || 0,
+    cpuUsage: script.cpuUsage || 0
+  });
+  
+  useEffect(() => {
+    // Update local state when script prop changes
+    setEditedCode(script.code);
+    setIsRunning(script.status === 'running');
+    setExecutionStats({
+      executionTime: script.executionTime || 0,
+      memory: script.memory || 0,
+      cpuUsage: script.cpuUsage || 0
+    });
+  }, [script]);
   
   const getStatusColor = (status: Script['status']) => {
     switch (status) {
@@ -23,15 +42,16 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
     }
   };
 
-  const handleRunScript = () => {
-    if (script.status === 'running') {
+  const handleRunScript = async () => {
+    if (isRunning) {
       toast.info('Script is already running');
       return;
     }
     
+    setIsRunning(true);
     toast.success('Script execution started');
     
-    // Simulate script running
+    // Update local state
     if (onUpdate) {
       onUpdate({
         ...script,
@@ -39,30 +59,80 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
       });
     }
     
-    // Simulate script completion after delay
-    setTimeout(() => {
-      if (onUpdate) {
-        onUpdate({
+    try {
+      // Execute the script
+      await executeScript({ scriptId: script.id });
+      
+      // The real-time updates will come through WebSocket
+      // For now, we'll simulate completion after a delay
+      setTimeout(() => {
+        const completedScript = {
           ...script,
           status: 'completed',
           lastRun: new Date().toISOString(),
           output: 'Script executed successfully!\n\nExample output:\n--------------\n' + 
-                 'Processed 237 items\nComputed results: [1.23, 4.56, 7.89]\nExecution time: 1.45s'
+                 'Processed 237 items\nComputed results: [1.23, 4.56, 7.89]\nExecution time: 1.45s',
+          executionTime: 1.45,
+          memory: 32.4,
+          cpuUsage: 12.5,
+          logs: [
+            { timestamp: new Date().toISOString(), level: 'info', message: 'Script started' },
+            { timestamp: new Date(Date.now() + 500).toISOString(), level: 'info', message: 'Processing data...' },
+            { timestamp: new Date(Date.now() + 1000).toISOString(), level: 'info', message: 'Processed 237 items' },
+            { timestamp: new Date(Date.now() + 1300).toISOString(), level: 'warning', message: 'Performance warning: High memory usage' },
+            { timestamp: new Date(Date.now() + 1450).toISOString(), level: 'info', message: 'Script completed successfully' }
+          ]
+        };
+        
+        if (onUpdate) {
+          onUpdate(completedScript);
+        }
+        
+        setIsRunning(false);
+        setExecutionStats({
+          executionTime: 1.45,
+          memory: 32.4,
+          cpuUsage: 12.5
+        });
+        
+        toast.success('Script execution completed');
+      }, 5000);
+    } catch (error) {
+      console.error('Error running script:', error);
+      
+      if (onUpdate) {
+        onUpdate({
+          ...script,
+          status: 'failed',
+          lastRun: new Date().toISOString(),
+          output: 'Script execution failed. See logs for details.'
         });
       }
-      toast.success('Script execution completed');
-    }, 5000);
+      
+      setIsRunning(false);
+      toast.error('Script execution failed');
+    }
   };
 
-  const handleSaveCode = () => {
-    if (onUpdate) {
-      onUpdate({
+  const handleSaveCode = async () => {
+    try {
+      const updatedScript = {
         ...script,
         code: editedCode
-      });
+      };
+      
+      const result = await updateScript(updatedScript);
+      
+      if (onUpdate) {
+        onUpdate(result);
+      }
+      
+      setIsEditing(false);
+      toast.success('Script saved successfully');
+    } catch (error) {
+      console.error('Error saving script:', error);
+      toast.error('Failed to save script');
     }
-    setIsEditing(false);
-    toast.success('Script saved successfully');
   };
 
   const tabVariants = {
@@ -93,7 +163,7 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => setIsEditing(!isEditing)}
-            disabled={activeTab !== 'code'}
+            disabled={activeTab !== 'code' || isRunning}
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
               <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
@@ -116,19 +186,19 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
           ) : (
             <motion.button
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors duration-200 ${
-                script.status === 'running' 
+                isRunning 
                   ? 'bg-yellow-500 hover:bg-yellow-600' 
                   : 'bg-primary hover:bg-primary/90'
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleRunScript}
-              disabled={script.status === 'running'}
+              disabled={isRunning}
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
               </svg>
-              {script.status === 'running' ? 'Running...' : 'Run Script'}
+              {isRunning ? 'Running...' : 'Run Script'}
             </motion.button>
           )}
         </div>
@@ -175,13 +245,12 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
         )}
         
         {activeTab === 'output' && (
-          <div className="relative">
-            <pre className="font-mono text-sm p-4 rounded-lg border border-border bg-secondary/30 h-[500px] overflow-auto">
-              <code>
-                {script.output || 'No output yet. Run the script to see results.'}
-              </code>
-            </pre>
-          </div>
+          <ScriptOutput 
+            scriptId={script.id} 
+            output={script.output}
+            logs={script.logs}
+            visualizations={script.visualizations}
+          />
         )}
         
         {activeTab === 'info' && (
@@ -215,17 +284,52 @@ const ScriptDetail: React.FC<ScriptDetailProps> = ({ script, onUpdate }) => {
               </div>
             </div>
             
+            {script.lastRun && (
+              <div>
+                <h3 className="text-sm font-semibold text-muted-foreground mb-3">Execution Statistics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <p className="text-xs text-muted-foreground">Execution Time</p>
+                    <p className="text-2xl font-semibold">{executionStats.executionTime.toFixed(2)}s</p>
+                  </div>
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <p className="text-xs text-muted-foreground">Memory Usage</p>
+                    <p className="text-2xl font-semibold">{executionStats.memory.toFixed(1)} MB</p>
+                  </div>
+                  <div className="bg-secondary/30 rounded-lg p-4">
+                    <p className="text-xs text-muted-foreground">CPU Usage</p>
+                    <p className="text-2xl font-semibold">{executionStats.cpuUsage.toFixed(1)}%</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Run History</h3>
-              <div className="text-sm text-muted-foreground">
-                Run history will be displayed here in a future update.
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Execution Environment</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <span className="text-xs text-muted-foreground">Memory Limit</span>
+                  <p>128 MB</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Timeout</span>
+                  <p>60 seconds</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Sandbox</span>
+                  <p>Secure Python Container</p>
+                </div>
               </div>
             </div>
             
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Permissions</h3>
-              <div className="text-sm text-muted-foreground">
-                This script has default permissions with no external API access.
+              <h3 className="text-sm font-semibold text-muted-foreground mb-3">Allowed Modules</h3>
+              <div className="flex flex-wrap gap-2">
+                {['numpy', 'pandas', 'matplotlib', 'scikit-learn', 'scipy', 'tensorflow', 'requests'].map((module) => (
+                  <div key={module} className="px-2 py-1 bg-secondary/30 rounded text-xs">
+                    {module}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

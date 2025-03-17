@@ -1,12 +1,12 @@
 
 import { useParams, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { mockScripts } from '../lib/mockData';
 import { Script } from '../lib/types';
 import Layout from '../components/Layout';
 import ScriptDetail from '../components/ScriptDetail';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
+import { getScriptById, initializeWebSocket } from '../services/scriptService';
 
 const ScriptView = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,15 +15,21 @@ const ScriptView = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate API fetch
+    // Initialize WebSocket connection
+    initializeWebSocket();
+    
+    // Fetch the script
     const fetchScript = async () => {
       setLoading(true);
       try {
-        // In a real app, we would fetch the script from the server
-        const foundScript = mockScripts.find(s => s.id === id);
+        if (!id) {
+          throw new Error("Script ID is required");
+        }
         
-        if (foundScript) {
-          setScript(foundScript);
+        const fetchedScript = await getScriptById(id);
+        
+        if (fetchedScript) {
+          setScript(fetchedScript);
         } else {
           toast.error('Script not found');
           navigate('/dashboard');
