@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
-import { useEffect, useState, ErrorBoundary } from "react";
+import { useEffect, useState } from "react";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import ScriptView from "./pages/ScriptView";
@@ -73,8 +73,8 @@ const App = () => {
     
     // Check WebSocket connection status periodically
     const wsCheckInterval = setInterval(() => {
-      // This would ideally come from a state management store
-      const status = window.wsStatus || 'closed';
+      // Use a safer way to check the WS connection status
+      const status = (window as any).wsStatus || 'closed';
       setWsConnected(status === 'open');
     }, 5000);
     

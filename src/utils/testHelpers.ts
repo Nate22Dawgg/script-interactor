@@ -31,14 +31,21 @@ export const createTestScript = (overrides = {}): Script => {
 
 /**
  * Mock WebSocket for testing WebSocket functionality
+ * Implements just enough of the WebSocket interface for testing
  */
 export class MockWebSocket {
   url: string;
   readyState: number = WebSocket.CONNECTING;
-  onopen: ((this: WebSocket, ev: Event) => any) | null = null;
-  onclose: ((this: WebSocket, ev: CloseEvent) => any) | null = null;
-  onmessage: ((this: WebSocket, ev: MessageEvent) => any) | null = null;
-  onerror: ((this: WebSocket, ev: Event) => any) | null = null;
+  onopen: ((ev: Event) => any) | null = null;
+  onclose: ((ev: CloseEvent) => any) | null = null;
+  onmessage: ((ev: MessageEvent) => any) | null = null;
+  onerror: ((ev: Event) => any) | null = null;
+  
+  // Adding required WebSocket properties to satisfy TypeScript
+  binaryType: BinaryType = 'blob';
+  bufferedAmount: number = 0;
+  extensions: string = '';
+  protocol: string = '';
   
   private messages: any[] = [];
   
@@ -49,7 +56,8 @@ export class MockWebSocket {
     setTimeout(() => {
       this.readyState = WebSocket.OPEN;
       if (this.onopen) {
-        this.onopen(new Event('open'));
+        const event = new Event('open');
+        this.onopen(event);
       }
     }, 100);
   }
@@ -58,10 +66,15 @@ export class MockWebSocket {
     this.messages.push(JSON.parse(data));
   }
   
-  close(): void {
+  close(code?: number, reason?: string): void {
     this.readyState = WebSocket.CLOSED;
     if (this.onclose) {
-      this.onclose(new CloseEvent('close'));
+      const event = new CloseEvent('close', {
+        code: code || 1000,
+        reason: reason || '',
+        wasClean: true
+      });
+      this.onclose(event);
     }
   }
   
@@ -72,9 +85,10 @@ export class MockWebSocket {
    */
   simulateMessage(data: any): void {
     if (this.onmessage) {
-      this.onmessage(new MessageEvent('message', {
+      const event = new MessageEvent('message', {
         data: JSON.stringify(data)
-      }));
+      });
+      this.onmessage(event);
     }
   }
   
@@ -83,7 +97,8 @@ export class MockWebSocket {
    */
   simulateError(): void {
     if (this.onerror) {
-      this.onerror(new Event('error'));
+      const event = new Event('error');
+      this.onerror(event);
     }
   }
   
@@ -92,6 +107,31 @@ export class MockWebSocket {
    */
   getSentMessages(): any[] {
     return this.messages;
+  }
+  
+  // Implementing missing WebSocket methods to satisfy TypeScript
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    // Simple implementation for testing
+    if (typeof listener === 'function') {
+      if (type === 'open') this.onopen = listener;
+      if (type === 'close') this.onclose = listener as (ev: CloseEvent) => any;
+      if (type === 'message') this.onmessage = listener as (ev: MessageEvent) => any;
+      if (type === 'error') this.onerror = listener;
+    }
+  }
+  
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    // Simple implementation for testing
+    if (typeof listener === 'function') {
+      if (type === 'open' && this.onopen === listener) this.onopen = null;
+      if (type === 'close' && this.onclose === listener) this.onclose = null;
+      if (type === 'message' && this.onmessage === listener) this.onmessage = null;
+      if (type === 'error' && this.onerror === listener) this.onerror = null;
+    }
+  }
+  
+  dispatchEvent(event: Event): boolean {
+    return true; // Minimal implementation
   }
 }
 
