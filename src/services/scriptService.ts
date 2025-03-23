@@ -2,7 +2,7 @@
 import { Script, ScriptExecutionRequest, ScriptExecutionResponse } from '../lib/types';
 import { toast } from 'sonner';
 import { initializeWebSocket, subscribeToScript } from './websocketService';
-import { executeScript as runScript } from './scriptExecutionService';
+import { executeScript as runScript } from './scriptExecution';
 import { analyzeScriptForParameters } from './parameterAnalyzerService';
 import { generateUIFromParameters, generateMockUI } from './uiGeneratorService';
 import { generateMockParameters } from './mockDataService';

@@ -1,6 +1,6 @@
 
 import { Script, ScriptExecutionRequest } from '../lib/types';
-import { validateScript } from '../services/scriptExecutionService';
+import { validateScript } from '../services/scriptExecution';
 
 /**
  * Test script execution in a sandboxed environment
