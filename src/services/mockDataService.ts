@@ -1,7 +1,7 @@
 
 import { Parameter, Script } from '../lib/types';
 import { generateUIFromParameters } from './uiGeneratorService';
-import { validateScript } from './scriptExecutionService';
+import { validateScript } from './scriptExecution';
 
 // Generate mock parameters for demo purposes
 export const generateMockParameters = (script: Script): Parameter[] => {
