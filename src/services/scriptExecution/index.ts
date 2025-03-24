@@ -15,5 +15,7 @@ export {
 
 // Re-export types
 export type { 
-  ValidationResult
+  ValidationResult,
+  ResourceLimits,
+  NGSScriptConfig
 } from './types';

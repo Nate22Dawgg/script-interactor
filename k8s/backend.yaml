@@ -21,16 +21,22 @@ spec:
         - containerPort: 8000
         resources:
           limits:
-            cpu: "1"
-            memory: "1Gi"
+            cpu: "2"
+            memory: "4Gi"
           requests:
             cpu: "500m"
-            memory: "512Mi"
+            memory: "1Gi"
         env:
         - name: NODE_ENV
           value: "production"
         - name: REDIS_HOST
           value: "redis"
+        - name: PYTHON_PACKAGES
+          value: "numpy,pandas,matplotlib,biopython,pysam,cutadapt,scikit-learn,scipy"
+        - name: MAX_UPLOAD_SIZE
+          value: "500mb"
+        - name: SCRIPT_EXECUTION_TIMEOUT
+          value: "600"
         livenessProbe:
           httpGet:
             path: /healthz

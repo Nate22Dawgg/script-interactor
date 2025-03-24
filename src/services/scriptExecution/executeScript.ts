@@ -1,4 +1,3 @@
-
 import { ScriptExecutionRequest, ScriptExecutionResponse } from '../../lib/types';
 import { toast } from 'sonner';
 import { sendWebSocketMessage, simulateScriptExecution } from '../websocket';
@@ -12,7 +11,15 @@ import {
   validateJavaScriptScript, 
   validateBashScript 
 } from './validators';
-import { ValidationResult } from './types';
+import { ValidationResult, ResourceLimits, NGSScriptConfig } from './types';
+
+// Default resource limits specifically for NGS processing
+const NGS_RESOURCE_LIMITS: ResourceLimits = {
+  memoryMB: 2048,
+  cpuMillicores: 1000,
+  diskMB: 1024,
+  timeoutSeconds: 600
+};
 
 // Execute a script with added security measures
 export const executeScript = async (request: ScriptExecutionRequest): Promise<ScriptExecutionResponse> => {
@@ -34,8 +41,15 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
   
   // Determine appropriate resource limits based on language
   const language = scriptDetails?.language || 'python';
-  const defaultLimits = LANGUAGE_RESOURCE_LIMITS[language as ScriptLanguage] || 
-                        LANGUAGE_RESOURCE_LIMITS[ScriptLanguage.PYTHON];
+  
+  // Check if this is an NGS script by examining script content or metadata
+  const isNGSScript = detectNGSScript(scriptDetails?.code || '', scriptDetails?.metadata);
+  
+  // Apply NGS-specific limits if needed
+  const defaultLimits = isNGSScript 
+    ? NGS_RESOURCE_LIMITS 
+    : (LANGUAGE_RESOURCE_LIMITS[language as ScriptLanguage] || 
+       LANGUAGE_RESOURCE_LIMITS[ScriptLanguage.PYTHON]);
   
   // Merge default limits with any provided limits
   const executionLimits = {
@@ -43,13 +57,21 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
     ...(request.executionLimits || {})
   };
   
+  // Add NGS-specific configuration if detected
+  const ngsConfig: NGSScriptConfig | undefined = isNGSScript ? {
+    threadCount: request.parameters?.threads || 4,
+    referenceGenome: request.parameters?.reference || 'hg38',
+    qualityThreshold: request.parameters?.quality || 20
+  } : undefined;
+  
   // Send execution request via WebSocket if available
   const messageSent = sendWebSocketMessage({
     type: MessageType.EXECUTE_SCRIPT,
     scriptId: request.scriptId,
     parameters: sanitizedParameters,
     language: language,
-    executionLimits
+    executionLimits,
+    ngsConfig
   });
   
   if (!messageSent && window.executeScriptFallback) {
@@ -66,6 +88,26 @@ export const executeScript = async (request: ScriptExecutionRequest): Promise<Sc
     startTime: new Date().toISOString()
   };
 };
+
+// Helper function to detect if a script is likely processing NGS data
+function detectNGSScript(code: string, metadata?: any): boolean {
+  // Check for common NGS libraries and functions
+  const ngsKeywords = [
+    'pysam', 'Bio.SeqIO', 'fastq', 'fasta', 'bam', 'sam', 'vcf', 
+    'sequencing', 'alignment', 'variant', 'genome', 'bowtie', 'bwa',
+    'read_depth', 'coverage', 'trimming', 'adapter'
+  ];
+  
+  // If metadata explicitly marks it as NGS, use that
+  if (metadata?.type === 'ngs' || metadata?.category === 'ngs') {
+    return true;
+  }
+  
+  // Otherwise check code content
+  return ngsKeywords.some(keyword => 
+    code.toLowerCase().includes(keyword.toLowerCase())
+  );
+}
 
 // Enhanced script validation with multi-language support
 export const validateScript = (code: string, language: string = 'python'): ValidationResult => {
