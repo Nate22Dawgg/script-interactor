@@ -13,11 +13,6 @@ services:
       - backend
     networks:
       - app-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
 
   # Backend API and WebSocket service
   backend:
@@ -32,16 +27,10 @@ services:
       - NODE_ENV=production
       - MAX_SCRIPT_SIZE=10485760  # 10MB
       - MAX_EXECUTION_TIME=300    # 5 minutes
-      - ALLOWED_ORIGINS=https://your-domain.com
     depends_on:
       - redis
     networks:
       - app-network
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
 
   # Redis for caching and message queuing
   redis:
@@ -52,57 +41,11 @@ services:
       - redis-data:/data
     networks:
       - app-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-
-  # Prometheus for metrics collection
-  prometheus:
-    image: prom/prometheus:latest
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
-    ports:
-      - "9090:9090"
-    networks:
-      - monitoring-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-
-  # Grafana for monitoring dashboards
-  grafana:
-    image: grafana/grafana:latest
-    volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
-      - grafana-data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin_password
-      - GF_USERS_ALLOW_SIGN_UP=false
-    ports:
-      - "3000:3000"
-    depends_on:
-      - prometheus
-    networks:
-      - monitoring-network
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
 
 networks:
   app-network:
-    driver: bridge
-  monitoring-network:
     driver: bridge
 
 volumes:
   script-data:
   redis-data:
-  prometheus-data:
-  grafana-data:
