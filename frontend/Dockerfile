@@ -1,4 +1,3 @@
-
 # Base Node.js image
 FROM node:20-alpine as builder
 
@@ -7,9 +6,9 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
-# Copy source code
+# Copy source code  
 COPY . .
 
 # Build the application
@@ -24,8 +23,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
+# Expose is just documentation, it doesn't actually the port
 EXPOSE 80
 
-# Start nginx
+# Start nginx (best practice for nginx base image)
 CMD ["nginx", "-g", "daemon off;"]
+

@@ -1,9 +1,8 @@
-
 services:
   # Frontend application
   frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "80:80"
@@ -19,7 +18,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    volumes:
+    volumes: 
       - script-data:/app/scripts
     environment:
       - NODE_ENV=production
@@ -34,3 +33,4 @@ networks:
 
 volumes:
   script-data:
+
