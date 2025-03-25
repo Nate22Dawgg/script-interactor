@@ -1,69 +1,58 @@
-# Welcome to your Lovable project
 
-## Project info
+# Script Execution Platform
 
-**URL**: https://lovable.dev/projects/f427b1e8-9dd5-47d5-a75e-5eb6c9b44457
+This project provides a web-based platform for uploading, managing, and executing Python scripts with a real-time interface.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- Upload Python scripts
+- Execute scripts with parameters
+- Real-time execution feedback via WebSockets
+- Script management (listing, viewing, updating)
+- Containerized deployment with Docker
 
-**Use Lovable**
+## Architecture
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f427b1e8-9dd5-47d5-a75e-5eb6c9b44457) and start prompting.
+The application consists of:
 
-Changes made via Lovable will be committed automatically to this repo.
+1. **Frontend**: A React-based web application
+2. **Backend**: Node.js server with Express and WebSockets
+3. **Execution Environment**: Python script execution engine
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Prerequisites
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Docker and Docker Compose
+- Node.js (for local development)
+- Python 3.x (for script execution)
 
-Follow these steps:
+### Running with Docker
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+1. Clone this repository
+2. Build and start the containers:
+   ```
+   docker-compose up
+   ```
+3. Access the application at http://localhost
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## Development
 
-# Step 3: Install the necessary dependencies.
-npm i
+For local development:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+1. Start the backend:
+   ```
+   cd backend
+   npm install
+   npm start
+   ```
 
-**Edit a file directly in GitHub**
+2. Start the frontend:
+   ```
+   npm install
+   npm run dev
+   ```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## License
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/f427b1e8-9dd5-47d5-a75e-5eb6c9b44457) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This project is open-source and available under the MIT License.
