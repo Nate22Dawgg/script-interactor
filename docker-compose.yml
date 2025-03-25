@@ -17,7 +17,7 @@ services:
   # Backend API and WebSocket service
   backend:
     build:
-      context: ./backend  # You'll need to create this folder with backend code
+      context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
@@ -27,18 +27,6 @@ services:
       - NODE_ENV=production
       - MAX_SCRIPT_SIZE=10485760  # 10MB
       - MAX_EXECUTION_TIME=300    # 5 minutes
-    depends_on:
-      - redis
-    networks:
-      - app-network
-
-  # Redis for caching and message queuing
-  redis:
-    image: redis:alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
     networks:
       - app-network
 
@@ -48,4 +36,3 @@ networks:
 
 volumes:
   script-data:
-  redis-data:
